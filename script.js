@@ -946,6 +946,12 @@ if(n == 0) {
             stmt = stmt.trim();
             if (!stmt || stmt.startsWith('//')) return;
 
+            // Strip trailing semicolons (but not inside strings)
+            if (stmt.endsWith(';')) {
+                // Simple strip — semicolons inside string literals won't be at the end anyway
+                stmt = stmt.slice(0, -1).trim();
+            }
+
             // print(...)
             const printMatch = stmt.match(/^print\s*\((.+)\)$/);
             if (printMatch) {
@@ -1306,6 +1312,9 @@ if(n == 0) {
         running = false;
         runBtn.textContent = '▶ Run';
         runBtn.disabled = false;
+
+        // Restore focus to the editor for continued typing
+        editor.focus();
     }
 
     function stopProgram() {
