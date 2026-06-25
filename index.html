@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProCalc — Professional Programmable Scientific Calculator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar – Program Editor -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>📝 Program Editor</h2>
+                <button class="btn-icon" id="closeSidebar" title="Close sidebar">&times;</button>
+            </div>
+            <div class="program-tabs" id="programTabs">
+                <button class="program-tab active" data-tab="editor">Editor</button>
+                <button class="program-tab" data-tab="library">Library</button>
+            </div>
+            <div class="program-panel active" id="panelEditor">
+                <div class="program-toolbar">
+                    <select id="programSelect">
+                        <option value="new">+ New Program…</option>
+                    </select>
+                    <button class="btn-sm" id="saveProgramBtn" title="Save program">💾</button>
+                    <button class="btn-sm" id="deleteProgramBtn" title="Delete program">🗑️</button>
+                </div>
+                <textarea id="programEditor" spellcheck="false" placeholder="Write your program here…&#10;&#10;Available commands:&#10;  print(expr)       — display result&#10;  let x = expr      — assign variable&#10;  if(cond) { ... }  — conditional&#10;  while(cond) { }   — loop&#10;  for(i=0; i&lt;n; i++) { }&#10;  input(prompt)     — get user input&#10;&#10;Examples:&#10;  // Fibonacci&#10;  let a = 0; let b = 1;&#10;  for(i=0; i&lt;10; i++) {&#10;    print(a);&#10;    let t = a + b;&#10;    a = b; b = t;&#10;  }&#10;&#10;  // Quadratic formula&#10;  let a = input('a:');&#10;  let b = input('b:');&#10;  let c = input('c:');&#10;  let d = sqrt(b*b - 4*a*c);&#10;  print('x1 =', (-b+d)/(2*a));&#10;  print('x2 =', (-b-d)/(2*a));"></textarea>
+                <div class="program-actions">
+                    <button class="btn-run" id="runProgramBtn">▶ Run</button>
+                    <button class="btn-stop" id="stopProgramBtn">■ Stop</button>
+                    <button class="btn-clear" id="clearOutputBtn">Clear Output</button>
+                </div>
+                <div class="program-output" id="programOutput"></div>
+            </div>
+            <div class="program-panel" id="panelLibrary">
+                <div class="library-list" id="libraryList">
+                    <div class="library-item" data-name="fibonacci">
+                        <strong>Fibonacci</strong>
+                        <span>Generates Fibonacci sequence</span>
+                    </div>
+                    <div class="library-item" data-name="quadratic">
+                        <strong>Quadratic Solver</strong>
+                        <span>Solves ax²+bx+c=0</span>
+                    </div>
+                    <div class="library-item" data-name="factorial">
+                        <strong>Factorial</strong>
+                        <span>Computes n! iteratively</span>
+                    </div>
+                    <div class="library-item" data-name="primecheck">
+                        <strong>Prime Check</strong>
+                        <span>Checks if a number is prime</span>
+                    </div>
+                    <div class="library-item" data-name="statistics">
+                        <strong>Statistics</strong>
+                        <span>Mean, median, std deviation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Calculator -->
+        <div class="main">
+            <!-- Top Bar -->
+            <header class="topbar">
+                <button class="btn-icon" id="menuBtn" title="Toggle sidebar">☰</button>
+                <h1>ProCalc <span class="subtitle">Scientific</span></h1>
+                <div class="topbar-right">
+                    <span class="angle-indicator" id="angleIndicator">DEG</span>
+                    <span class="mem-indicator" id="memIndicator">M</span>
+                </div>
+            </header>
+
+            <!-- Display -->
+            <div class="display">
+                <div class="expression" id="expression"></div>
+                <div class="result" id="result">0</div>
+                <div class="display-mode-badges">
+                    <span class="badge" id="angleBadge">DEG</span>
+                    <span class="badge" id="memBadge" style="display:none">M</span>
+                    <span class="badge" id="invBadge" style="display:none">INV</span>
+                    <span class="badge" id="hypBadge" style="display:none">HYP</span>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div class="history-bar" id="historyBar">
+                <div class="history-header">
+                    <span>History</span>
+                    <button class="btn-icon-sm" id="clearHistoryBtn" title="Clear history">×</button>
+                </div>
+                <div class="history-list" id="historyList"></div>
+            </div>
+
+            <!-- Buttons -->
+            <div class="buttons" id="buttonPanel">
+                <!-- Row 0 – Advanced -->
+                <button class="btn fn" data-action="inv">INV</button>
+                <button class="btn fn" data-action="hyp">HYP</button>
+                <button class="btn fn" data-action="deg">DEG</button>
+                <button class="btn fn" data-action="rand">RAND</button>
+                <button class="btn fn" data-action="EE">EE</button>
+
+                <!-- Row 1 – Memory / Clear -->
+                <button class="btn mem" data-action="mc">MC</button>
+                <button class="btn mem" data-action="mr">MR</button>
+                <button class="btn mem" data-action="mplus">M+</button>
+                <button class="btn mem" data-action="mminus">M−</button>
+                <button class="btn op" data-action="clear">AC</button>
+
+                <!-- Row 2 – Functions -->
+                <button class="btn fn" data-action="sin">sin</button>
+                <button class="btn fn" data-action="cos">cos</button>
+                <button class="btn fn" data-action="tan">tan</button>
+                <button class="btn fn" data-action="log">log</button>
+                <button class="btn fn" data-action="ln">ln</button>
+
+                <!-- Row 3 -->
+                <button class="btn fn" data-action="sinh">sinh</button>
+                <button class="btn fn" data-action="cosh">cosh</button>
+                <button class="btn fn" data-action="tanh">tanh</button>
+                <button class="btn fn" data-action="sqrt">√x</button>
+                <button class="btn op" data-action="pow">xʸ</button>
+
+                <!-- Row 4 -->
+                <button class="btn fn" data-action="asin">sin⁻¹</button>
+                <button class="btn fn" data-action="acos">cos⁻¹</button>
+                <button class="btn fn" data-action="atan">tan⁻¹</button>
+                <button class="btn fn" data-action="square">x²</button>
+                <button class="btn op" data-action="fact">x!</button>
+
+                <!-- Row 5 -->
+                <button class="btn fn" data-action="pi">π</button>
+                <button class="btn fn" data-action="euler">e</button>
+                <button class="btn fn" data-action="exp">eˣ</button>
+                <button class="btn fn" data-action="tenx">10ˣ</button>
+                <button class="btn op" data-action="recip">1/x</button>
+
+                <!-- Row 6 – Numbers -->
+                <button class="btn num" data-action="7">7</button>
+                <button class="btn num" data-action="8">8</button>
+                <button class="btn num" data-action="9">9</button>
+                <button class="btn op" data-action="lparen">(</button>
+                <button class="btn op" data-action="rparen">)</button>
+
+                <!-- Row 7 -->
+                <button class="btn num" data-action="4">4</button>
+                <button class="btn num" data-action="5">5</button>
+                <button class="btn num" data-action="6">6</button>
+                <button class="btn op" data-action="multiply">×</button>
+                <button class="btn op" data-action="divide">÷</button>
+
+                <!-- Row 8 -->
+                <button class="btn num" data-action="1">1</button>
+                <button class="btn num" data-action="2">2</button>
+                <button class="btn num" data-action="3">3</button>
+                <button class="btn op" data-action="add">+</button>
+                <button class="btn op" data-action="subtract">−</button>
+
+                <!-- Row 9 -->
+                <button class="btn num" data-action="0">0</button>
+                <button class="btn num" data-action="decimal">.</button>
+                <button class="btn fn" data-action="negate">±</button>
+                <button class="btn op" data-action="mod">MOD</button>
+                <button class="btn eq" data-action="equals">=</button>
+            </div>
+
+            <!-- Status bar -->
+            <footer class="statusbar">
+                <span id="statusMessage">Ready</span>
+                <span id="cursorPos"></span>
+            </footer>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
