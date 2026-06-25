@@ -73,19 +73,20 @@
             </header>
 
             <!-- Display -->
-            <div class="display">
-                <div class="expression" id="expression"></div>
-                <div class="result" id="result">0</div>
-                <div class="display-mode-badges">
-                    <span class="badge" id="angleBadge">DEG</span>
-                    <span class="badge" id="memBadge" style="display:none">M</span>
-                    <span class="badge" id="invBadge" style="display:none">INV</span>
-                    <span class="badge" id="hypBadge" style="display:none">HYP</span>
+            <div class="main-scroll">
+                <div class="display">
+                    <div class="expression" id="expression"></div>
+                    <div class="result" id="result">0</div>
+                    <div class="display-mode-badges">
+                        <span class="badge" id="angleBadge">DEG</span>
+                        <span class="badge" id="memBadge" style="display:none">M</span>
+                        <span class="badge" id="invBadge" style="display:none">INV</span>
+                        <span class="badge" id="hypBadge" style="display:none">HYP</span>
+                    </div>
                 </div>
-            </div>
 
-            <!-- History -->
-            <div class="history-bar" id="historyBar">
+                <!-- History -->
+                <div class="history-bar" id="historyBar">
                 <div class="history-header">
                     <span>History</span>
                     <button class="btn-icon-sm" id="clearHistoryBtn" title="Clear history">×</button>
@@ -165,6 +166,7 @@
                 <button class="btn op" data-action="mod">MOD</button>
                 <button class="btn eq" data-action="equals">=</button>
             </div>
+            </div><!-- /main-scroll -->
 
             <!-- Status bar -->
             <footer class="statusbar">

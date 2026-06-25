@@ -551,6 +551,17 @@ const Calc = (() => {
     // --- Keyboard binding ---
     function initKeyboard() {
         document.addEventListener('keydown', (e) => {
+            const tag = document.activeElement.tagName;
+            // Ignore when user is typing in an input/textarea (like the program editor)
+            if (tag === 'TEXTAREA' || tag === 'INPUT' || document.activeElement.isContentEditable) {
+                // Still allow Ctrl+Shift+P to toggle sidebar
+                if (e.ctrlKey && e.shiftKey && e.key === 'P') {
+                    toggleSidebar();
+                    e.preventDefault();
+                }
+                return;
+            }
+
             const key = e.key;
             // Ctrl+Shift+P to toggle sidebar
             if (e.ctrlKey && e.shiftKey && key === 'P') {
@@ -834,7 +845,12 @@ if(n == 0) {
         }
 
         log(...args) {
-            this.outputLines.push({ type: 'print', text: args.map(a => typeof a === 'number' ? Calc.formatNum(a) : String(a)).join(' ') });
+            const formatted = args.map(a => {
+                if (Array.isArray(a)) return '[' + a.map(v => typeof v === 'number' ? Calc.formatNum(v) : String(v)).join(', ') + ']';
+                if (typeof a === 'number') return Calc.formatNum(a);
+                return String(a);
+            }).join(' ');
+            this.outputLines.push({ type: 'print', text: formatted });
         }
 
         error(msg) {
@@ -939,29 +955,55 @@ if(n == 0) {
                 return;
             }
 
-            // input(prompt)
-            const inputMatch = stmt.match(/^input\s*\((.+)\)$/);
-            if (inputMatch) {
-                const prompt = this.evalString(inputMatch[1]);
-                const val = await this.getInput(prompt);
-                return val;
+            // input(prompt) as a standalone statement (value is discarded)
+            const inputOnlyMatch = stmt.match(/^input\s*\((.+)\)$/);
+            if (inputOnlyMatch) {
+                const prompt = this.evalString(inputOnlyMatch[1]);
+                await this.getInput(prompt);
+                return;
             }
 
-            // let x = expr
-            const letMatch = stmt.match(/^let\s+([a-zA-Z_]\w*)\s*=\s*(.+)$/);
-            if (letMatch) {
-                const name = letMatch[1];
-                const val = this.evalExpr(letMatch[2]);
+            // --- Handle assignments that may contain input() ---
+            // let x = input(...) or x = input(...)
+            const letAssignMatch = stmt.match(/^(?:let\s+)?([a-zA-Z_]\w*)\s*=\s*(.+)$/);
+            if (letAssignMatch) {
+                const name = letAssignMatch[1];
+                const rhs = letAssignMatch[2].trim();
+
+                // Check if RHS contains input()
+                const inputCall = rhs.match(/^input\s*\((.+)\)$/);
+                if (inputCall) {
+                    const prompt = this.evalString(inputCall[1]);
+                    const val = await this.getInput(prompt);
+                    this.vars[name] = val;
+                    return;
+                }
+
+                // Regular expression evaluation
+                const val = this.evalExpr(rhs);
                 this.vars[name] = val;
                 return;
             }
 
-            // x = expr (assignment to existing var or new)
-            const assignMatch = stmt.match(/^([a-zA-Z_]\w*)\s*=\s*(.+)$/);
-            if (assignMatch) {
-                const name = assignMatch[1];
-                const val = this.evalExpr(assignMatch[2]);
-                this.vars[name] = val;
+            // Compound assignments with input: x += input(...), etc.
+            const compoundMatch = stmt.match(/^([a-zA-Z_]\w*)\s*(\+=|-=|\*=|\/=)\s*(.+)$/);
+            if (compoundMatch) {
+                const name = compoundMatch[1];
+                if (!(name in this.vars)) throw new Error('Undefined variable: ' + name);
+                const rhs = compoundMatch[3].trim();
+
+                const inputCall = rhs.match(/^input\s*\((.+)\)$/);
+                if (inputCall) {
+                    const prompt = this.evalString(inputCall[1]);
+                    const val = await this.getInput(prompt);
+                    const ops = { '+=': (a,b) => a+b, '-=': (a,b) => a-b, '*=': (a,b) => a*b, '/=': (a,b) => a/b };
+                    this.vars[name] = ops[compoundMatch[2]](this.vars[name], val);
+                    return;
+                }
+
+                const val = this.evalExpr(rhs);
+                const ops = { '+=': (a,b) => a+b, '-=': (a,b) => a-b, '*=': (a,b) => a*b, '/=': (a,b) => a/b };
+                this.vars[name] = ops[compoundMatch[2]](this.vars[name], val);
                 return;
             }
 
@@ -981,18 +1023,6 @@ if(n == 0) {
                 const name = preIncMatch[2];
                 if (!(name in this.vars)) throw new Error('Undefined variable: ' + name);
                 this.vars[name] = preIncMatch[1] === '++' ? this.vars[name] + 1 : this.vars[name] - 1;
-                return;
-            }
-
-            // x += expr, x -= expr, etc.
-            const compoundMatch = stmt.match(/^([a-zA-Z_]\w*)\s*(\+=|-=|\*=|\/=)\s*(.+)$/);
-            if (compoundMatch) {
-                const name = compoundMatch[1];
-                if (!(name in this.vars)) throw new Error('Undefined variable: ' + name);
-                const rhs = this.evalExpr(compoundMatch[3]);
-                const op = compoundMatch[2];
-                const ops = { '+=': (a,b) => a+b, '-=': (a,b) => a-b, '*=': (a,b) => a*b, '/=': (a,b) => a/b };
-                this.vars[name] = ops[op](this.vars[name], rhs);
                 return;
             }
 
@@ -1050,7 +1080,7 @@ if(n == 0) {
             expr = expr.trim();
             if (expr === '') return undefined;
 
-            // Variable lookup
+            // Variable lookup (single variable)
             if (/^[a-zA-Z_]\w*$/.test(expr)) {
                 if (expr in this.vars) return this.vars[expr];
                 if (expr === 'pi') return Math.PI;
@@ -1063,11 +1093,11 @@ if(n == 0) {
                 return expr.slice(1, -1);
             }
 
-            // Replace variables
+            // Replace operators and built-in functions
             let s = expr;
-            for (const [name, val] of Object.entries(this.vars)) {
-                s = s.replace(new RegExp('\\b' + name + '\\b', 'g'), `(${typeof val === 'number' ? val : '"' + val + '"'})`);
-            }
+
+            // Replace ^ with ** for exponentiation
+            s = s.replace(/\^/g, '**');
 
             // Replace built-in functions with Math.*
             const funcMap = {
@@ -1084,12 +1114,12 @@ if(n == 0) {
                 s = s.replace(new RegExp('\\b' + k + '\\b(?=\\s*\\()', 'g'), v);
             }
 
-            // Replace operators
-            s = s.replace(/\^/g, '**');
-
             try {
-                const fn = new Function('return ' + s + ';');
-                const result = fn();
+                // Pass variables as function parameters to preserve arrays/objects
+                const varNames = Object.keys(this.vars).filter(n => /^[a-zA-Z_]\w*$/.test(n));
+                const varValues = varNames.map(n => this.vars[n]);
+                const fn = new Function(...varNames, 'return (' + s + ');');
+                const result = fn(...varValues);
                 return result;
             } catch(e) {
                 throw new Error('Expression error: ' + expr);
