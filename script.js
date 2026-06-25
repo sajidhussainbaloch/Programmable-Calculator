@@ -552,9 +552,10 @@ const Calc = (() => {
     function initKeyboard() {
         document.addEventListener('keydown', (e) => {
             const tag = document.activeElement.tagName;
+            const isInput = tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || document.activeElement.isContentEditable;
             // Ignore when user is typing in an input/textarea (like the program editor)
-            if (tag === 'TEXTAREA' || tag === 'INPUT' || document.activeElement.isContentEditable) {
-                // Still allow Ctrl+Shift+P to toggle sidebar
+            // Also ignore when the sidebar program editor is visible (user is likely working there)
+            if (isInput) {
                 if (e.ctrlKey && e.shiftKey && e.key === 'P') {
                     toggleSidebar();
                     e.preventDefault();
@@ -563,6 +564,7 @@ const Calc = (() => {
             }
 
             const key = e.key;
+
             // Ctrl+Shift+P to toggle sidebar
             if (e.ctrlKey && e.shiftKey && key === 'P') {
                 toggleSidebar();
@@ -570,15 +572,22 @@ const Calc = (() => {
                 return;
             }
 
+            // Ignore Ctrl/Cmd key combinations (copy, paste, etc.)
+            if (e.ctrlKey || e.metaKey) return;
+
             if (keyboardMap[key]) {
                 processAction(keyboardMap[key]);
                 e.preventDefault();
             }
-            // Allow shift+8 for multiply, etc.
             if (key === '(' || key === ')') {
                 processAction(key === '(' ? 'lparen' : 'rparen');
                 e.preventDefault();
             }
+        });
+
+        // Prevent paste into the calculator display area
+        document.querySelector('.display').addEventListener('paste', (e) => {
+            e.preventDefault();
         });
     }
 
@@ -946,13 +955,12 @@ if(n == 0) {
             stmt = stmt.trim();
             if (!stmt || stmt.startsWith('//')) return;
 
-            // Strip trailing semicolons (but not inside strings)
+            // Strip trailing semicolons
             if (stmt.endsWith(';')) {
-                // Simple strip — semicolons inside string literals won't be at the end anyway
                 stmt = stmt.slice(0, -1).trim();
             }
 
-            // print(...)
+            // ----- print(...) -----
             const printMatch = stmt.match(/^print\s*\((.+)\)$/);
             if (printMatch) {
                 const args = this.parseArgs(printMatch[1]);
@@ -961,46 +969,46 @@ if(n == 0) {
                 return;
             }
 
-            // input(prompt) as a standalone statement (value is discarded)
-            const inputOnlyMatch = stmt.match(/^input\s*\((.+)\)$/);
-            if (inputOnlyMatch) {
-                const prompt = this.evalString(inputOnlyMatch[1]);
+            // ----- Direct input() as statement (value discarded) -----
+            const inputDirectMatch = stmt.match(/^input\s*\((.+)\)$/);
+            if (inputDirectMatch) {
+                const prompt = this.evalString(inputDirectMatch[1]);
                 await this.getInput(prompt);
                 return;
             }
 
-            // --- Handle assignments that may contain input() ---
-            // let x = input(...) or x = input(...)
+            // ----- let <var> = input(...)  (with or without 'let') -----
+            // Match: [let] <name> = input(<prompt>)
+            const letInputMatch = stmt.match(/^(?:let\s+)?([a-zA-Z_]\w*)\s*=\s*input\s*\((.+)\)$/);
+            if (letInputMatch) {
+                const name = letInputMatch[1];
+                const prompt = this.evalString(letInputMatch[2]);
+                const val = await this.getInput(prompt);
+                this.vars[name] = val;
+                return;
+            }
+
+            // ----- let <var> = <expr>  (regular expression assignment) -----
             const letAssignMatch = stmt.match(/^(?:let\s+)?([a-zA-Z_]\w*)\s*=\s*(.+)$/);
             if (letAssignMatch) {
                 const name = letAssignMatch[1];
                 const rhs = letAssignMatch[2].trim();
-
-                // Check if RHS contains input()
-                const inputCall = rhs.match(/^input\s*\((.+)\)$/);
-                if (inputCall) {
-                    const prompt = this.evalString(inputCall[1]);
-                    const val = await this.getInput(prompt);
-                    this.vars[name] = val;
-                    return;
-                }
-
-                // Regular expression evaluation
                 const val = this.evalExpr(rhs);
                 this.vars[name] = val;
                 return;
             }
 
-            // Compound assignments with input: x += input(...), etc.
+            // ----- <var> <op>= <expr> (compound assignment) -----
             const compoundMatch = stmt.match(/^([a-zA-Z_]\w*)\s*(\+=|-=|\*=|\/=)\s*(.+)$/);
             if (compoundMatch) {
                 const name = compoundMatch[1];
                 if (!(name in this.vars)) throw new Error('Undefined variable: ' + name);
                 const rhs = compoundMatch[3].trim();
 
-                const inputCall = rhs.match(/^input\s*\((.+)\)$/);
-                if (inputCall) {
-                    const prompt = this.evalString(inputCall[1]);
+                // Check if RHS is input()
+                const rhsInput = rhs.match(/^input\s*\((.+)\)$/);
+                if (rhsInput) {
+                    const prompt = this.evalString(rhsInput[1]);
                     const val = await this.getInput(prompt);
                     const ops = { '+=': (a,b) => a+b, '-=': (a,b) => a-b, '*=': (a,b) => a*b, '/=': (a,b) => a/b };
                     this.vars[name] = ops[compoundMatch[2]](this.vars[name], val);
@@ -1013,30 +1021,29 @@ if(n == 0) {
                 return;
             }
 
-            // i++ / i-- (postfix increment/decrement)
+            // ----- i++ / i-- (postfix) -----
             const incMatch = stmt.match(/^([a-zA-Z_]\w*)\s*(\+\+|--)$/);
             if (incMatch) {
                 const name = incMatch[1];
                 if (!(name in this.vars)) throw new Error('Undefined variable: ' + name);
-                const old = this.vars[name];
-                this.vars[name] = incMatch[2] === '++' ? old + 1 : old - 1;
+                this.vars[name] += incMatch[2] === '++' ? 1 : -1;
                 return;
             }
 
-            // ++i / --i (prefix increment/decrement)
+            // ----- ++i / --i (prefix) -----
             const preIncMatch = stmt.match(/^(\+\+|--)\s*([a-zA-Z_]\w*)$/);
             if (preIncMatch) {
                 const name = preIncMatch[2];
                 if (!(name in this.vars)) throw new Error('Undefined variable: ' + name);
-                this.vars[name] = preIncMatch[1] === '++' ? this.vars[name] + 1 : this.vars[name] - 1;
+                this.vars[name] += preIncMatch[1] === '++' ? 1 : -1;
                 return;
             }
 
-            // break / continue
+            // ----- break / continue -----
             if (stmt === 'break') throw 'BREAK';
             if (stmt === 'continue') throw 'CONTINUE';
 
-            // Expression statement (evaluate and print)
+            // ----- Expression statement (fallback) -----
             const val = this.evalExpr(stmt);
             if (val !== undefined) {
                 this.log(val);
