@@ -628,7 +628,7 @@ const Calc = (() => {
         setStatus('Ready — press ? for help');
     }
 
-    return { init, processAction, getState, setDisplay, formatNum, unaryOps, binaryOps, evaluateExpr, addHistory };
+    return { init, processAction, getState, setDisplay, formatNum, unaryOps, binaryOps, evaluateExpr, addHistory, setStatus };
 })();
 
 
@@ -692,7 +692,7 @@ const Programmer = (() => {
         savePrograms(programs);
         populateSelect(programs);
         progSelect.value = name;
-        setStatus('Program "' + name + '" saved');
+        Calc.setStatus('Program "' + name + '" saved');
     }
 
     function deleteCurrentProgram() {
@@ -705,7 +705,7 @@ const Programmer = (() => {
         populateSelect(programs);
         progSelect.value = 'new';
         editor.value = '';
-        setStatus('Program deleted');
+        Calc.setStatus('Program deleted');
     }
 
     // --- Library programs ---
@@ -1275,9 +1275,9 @@ if(n == 0) {
             }
         }
 
-        async getInput(prompt) {
+        async getInput(msg) {
             return new Promise((resolve) => {
-                const val = prompt(prompt + ' ');
+                const val = window.prompt(msg + ' ');
                 if (val === null || val === '') {
                     resolve(0);
                     return;
@@ -1344,7 +1344,7 @@ if(n == 0) {
             } else {
                 progSelect.value = 'new';
             }
-            setStatus('Loaded: ' + name);
+            Calc.setStatus('Loaded: ' + name);
         }
     }
 
